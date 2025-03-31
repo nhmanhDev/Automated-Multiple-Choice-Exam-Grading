@@ -166,33 +166,33 @@ def annotate_block(columns, filled_cells, num_rows=10, label="sbd"):
     return annotated_block
 
 
-# Main execution
-image_path = 'Exam/Test003.jpg'
-resize_image(image_path, 'output_resized.jpg')
-sbd, mdt = detect_mid_contours('output_resized.jpg')
+# # Main execution
+# image_path = 'Exam/Test003.jpg'
+# resize_image(image_path, 'output_resized.jpg')
+# sbd, mdt = detect_mid_contours('output_resized.jpg')
 
-if sbd is None or mdt is None:
-    print("Cannot proceed due to missing regions.")
-else:
-    sbd_columns = process_sbd_id_block(sbd)
-    mdt_columns = process_mdt_block(mdt)
+# if sbd is None or mdt is None:
+#     print("Cannot proceed due to missing regions.")
+# else:
+#     sbd_columns = process_sbd_id_block(sbd)
+#     mdt_columns = process_mdt_block(mdt)
     
-    all_sbd_cells = process_all_columns(sbd_columns)
-    all_mdt_cells = process_all_columns(mdt_columns)
+#     all_sbd_cells = process_all_columns(sbd_columns)
+#     all_mdt_cells = process_all_columns(mdt_columns)
     
-    filled_sbd = check_all_columns_filled(all_sbd_cells)
-    filled_mdt = check_all_columns_filled(all_mdt_cells)
+#     filled_sbd = check_all_columns_filled(all_sbd_cells)
+#     filled_mdt = check_all_columns_filled(all_mdt_cells)
     
-    result_sbd = convert_filled_to_numbers_per_column(filled_sbd, 6)
-    result_mdt = convert_filled_to_numbers_per_column(filled_mdt, 3)
+#     result_sbd = convert_filled_to_numbers_per_column(filled_sbd, 6)
+#     result_mdt = convert_filled_to_numbers_per_column(filled_mdt, 3)
     
-    print("📌 Filled cells for student ID (SBD):")
-    for i, col in enumerate(result_sbd):
-        print(f"Column {i+1}: {col}")
-    print("📌 Filled cells for test code (MDT):")
-    for i, col in enumerate(result_mdt):
-        print(f"Column {i+1}: {col}")
+#     print("📌 Filled cells for student ID (SBD):")
+#     for i, col in enumerate(result_sbd):
+#         print(f"Column {i+1}: {col}")
+#     print("📌 Filled cells for test code (MDT):")
+#     for i, col in enumerate(result_mdt):
+#         print(f"Column {i+1}: {col}")
     
-    # Annotate blocks with unique window names
-    annotated_sbd = annotate_block(sbd_columns, filled_sbd, num_rows=10, label="sbd")
-    annotated_mdt = annotate_block(mdt_columns, filled_mdt, num_rows=10, label="mdt")
+#     # Annotate blocks with unique window names
+#     annotated_sbd = annotate_block(sbd_columns, filled_sbd, num_rows=10, label="sbd")
+#     annotated_mdt = annotate_block(mdt_columns, filled_mdt, num_rows=10, label="mdt")

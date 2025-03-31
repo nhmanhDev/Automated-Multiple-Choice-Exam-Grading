@@ -221,14 +221,14 @@ def resize_image(input_path, output_path, target_size=(1056, 1500)):
     cv2.imwrite(output_path, img_resized)
 
 
-if __name__ == '__main__':
-    image_path = 'Exam/Test003.jpg'
+# if __name__ == '__main__':
+#     image_path = 'Exam/Test003.jpg'
 
-    resize_image(image_path, 'output_resized.jpg')
+#     resize_image(image_path, 'output_resized.jpg')
 
-    img = cv2.imread('output_resized.jpg')
-    list_ans_boxes = crop_image(img)
-    list_ans = process_ans_blocks(list_ans_boxes)
-    list_ans = process_list_ans(list_ans)
-    answers = get_answers(list_ans)
-    print(answers)
+#     img = cv2.imread('output_resized.jpg')
+#     list_ans_boxes = crop_image(img)
+#     list_ans = process_ans_blocks(list_ans_boxes)
+#     list_ans = process_list_ans(list_ans)
+#     answers = get_answers(list_ans)
+#     print(answers)
