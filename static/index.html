@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chấm điểm bài thi</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            background-image: url('truong-dai-hoc-thang-long-1.jpg');
+            /* Đường dẫn tới ảnh nền */
+            background-size: contain;
+            /* Giữ tỷ lệ ảnh và đảm bảo không bị vỡ */
+            background-position: center;
+            /* Căn giữa ảnh */
+            background-repeat: repeat;
+            /* Không lặp lại ảnh */
+            background-color: #e6f3ff;
+            /* Màu nền dự phòng nếu ảnh không hiển thị */
+            color: #333;
+            padding: 20px;
+            line-height: 1.6;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+        }
+
+        /* Thiết lập box cho header */
+        .header-box {
+            background-color: #55a1d3;
+            /* Màu nền của header */
+            color: #fff;
+            /* Màu chữ */
+            padding: 20px;
+            border-radius: 50px;
+            margin-bottom: 50px;
+            width: 100%;
+            max-width: 600px;
+            /* Kích thước tối đa của box */
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            /* Kích thước chữ nhỏ hơn */
+            margin: 0;
+        }
+
+        .container {
+            display: flex;
+            max-width: 1000px;
+            width: 100%;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            gap: 30px;
+        }
+
+        .left-panel {
+            flex: 1;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .right-panel {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+        }
+
+        input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px dashed #3498db;
+            border-radius: 5px;
+            background-color: #ecf0f1;
+            cursor: pointer;
+            transition: border-color 0.3s;
+            margin-bottom: 15px;
+        }
+
+        input[type="file"]:hover {
+            border-color: #2980b9;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #3498db;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.3s;
+            margin-top: 10px;
+            margin-bottom: 20px;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        #preview {
+            max-width: 100%;
+            max-height: 600px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            display: none;
+            /* Ảnh chỉ hiển thị khi tải lên */
+        }
+
+        #downloadButton {
+            display: none;
+            margin-top: 10px;
+            background-color: #27ae60;
+        }
+
+        #downloadButton:hover {
+            background-color: #219653;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Header được bao trong box -->
+    <div class="header-box">
+        <h1>CHẤM ĐIỂM BÀI THI TRẮC NGHIỆM</h1>
+    </div>
+
+    <div class="container">
+        <div class="left-panel">
+            <label for="imageInput">Tải ảnh lên:</label>
+            <input type="file" id="imageInput" accept=".jpg,.jpeg,.png,.pdf" onchange="previewImage()">
+            <label for="answerKeyInput">Tải đáp án lên:</label>
+            <input type="file" id="answerKeyInput" accept=".xlsx" onchange="resetDownloadButton()">
+            <button onclick="uploadFiles()">Chấm điểm!</button>
+            <button id="downloadButton" onclick="downloadImage()" style="display: none;">Tải ảnh xuống</button>
+        </div>
+        <div class="right-panel">
+            <img id="preview" alt="Ảnh tải lên">
+        </div>
+    </div>
+    <script>
+        function previewImage() {
+            const file = document.getElementById('imageInput').files[0];
+            const preview = document.getElementById('preview');
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    preview.src = e.target.result;
+                    preview.style.display = 'block';
+                    // Ẩn nút tải xuống khi người dùng tải ảnh mới
+                    document.getElementById('downloadButton').style.display = 'none';
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function resetDownloadButton() {
+            // Ẩn nút tải xuống khi người dùng tải file đáp án mới
+            document.getElementById('downloadButton').style.display = 'none';
+        }
+
+        async function uploadFiles() {
+            const imageInput = document.getElementById('imageInput');
+            const answerKeyInput = document.getElementById('answerKeyInput');
+            const imageFile = imageInput.files[0];
+            const answerKeyFile = answerKeyInput.files[0];
+
+            if (!imageFile || !answerKeyFile) {
+                alert("Vui lòng chọn cả ảnh bài thi và file đáp án.");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("image", imageFile);
+            formData.append("answer_key", answerKeyFile);
+
+            try {
+                const response = await fetch("/upload-image", {
+                    method: "POST",
+                    body: formData
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    // Hiển thị kết quả chấm điểm thay vì ảnh gốc
+                    document.getElementById('preview').src = result.annotated_image_url;
+                    document.getElementById('downloadButton').style.display = 'block';
+                    document.getElementById('downloadButton').setAttribute('data-url', result.annotated_image_url);
+                } else {
+                    alert("Lỗi: " + result.error);
+                }
+            } catch (error) {
+                alert("Lỗi kết nối: " + error.message);
+            }
+        }
+
+        function downloadImage() {
+            const url = document.getElementById('downloadButton').getAttribute('data-url');
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'ket_qua_bai_thi.jpg';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+
+</html>
