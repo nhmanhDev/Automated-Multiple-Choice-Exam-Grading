@@ -1,9 +1,9 @@
-AUTOMATED MULTIPLE-CHOICE EXAM GRADING
+# AUTOMATED MULTIPLE-CHOICE EXAM GRADING
 
-PROJECT OVERVIEW
+## PROJECT OVERVIEW
 This project automates the grading process for multiple-choice exams by processing scanned answer sheets and answer keys. It aims to simplify evaluation, reduce human error, and provide quick, accurate results with a user-friendly interface.
 
-FEATURES
+## FEATURES
 
 Upload scanned answer sheets (images).
 Upload answer keys (Excel files).
@@ -13,20 +13,27 @@ Download graded results as images.
 Web-based user interface for easy interaction.
 REQUIREMENTS
 
-Python 3.7+
+Python 3.12
 A web browser (Chrome, Firefox, etc.)
 Optional: Ngrok (for public access)
 Create a requirements.txt file with the following dependencies:
-fastapi==0.110.0
-uvicorn==0.29.0
-opencv-python==4.11.0.80
+
+fastapi==0.115.12
+uvicorn==0.34.0
+opencv-python==4.11.0.86
 pandas==2.2.3
-Pillow==10.3.0
+pillow==10.3.0
+tensorflow==2.17.0
+numpy==1.23.5
+pdf2image==1.17.0
+imutils==0.5.4
+python-multipart  
+openpyxl==3.1.2
 
 Install them using:
 pip install -r requirements.txt
 
-INSTALLATION
+## INSTALLATION
 
 Clone the repository: git clone https://github.com/nhmanhDev/Automated-Multiple-Choice-Exam-Grading.git
 Navigate to the project directory: cd Automated-Multiple-Choice-Exam-Grading
@@ -50,7 +57,7 @@ Click "Tải ảnh xuống" to download the graded image.
 Running Publicly (Optional with Ngrok)
 If you want others to access your interface over the internet:
 
-Download Ngrok:
+## Download Ngrok:
 Get it from https://ngrok.com/download and extract ngrok.exe into the project directory.
 Run the Server:
 Start the FastAPI server (as above): uvicorn main:app --host 0.0.0.0 --port 8000
@@ -75,8 +82,8 @@ HTML/CSS/JavaScript: Frontend interface.
 CONTRIBUTING
 Contributions are welcome! Please fork the repository and submit a pull request.
 
-LICENSE
+## LICENSE
 This project is licensed under the MIT License. See the LICENSE file for details.
 
-CONTACT
+## CONTACT
 For questions or feedback, please contact nhmanh.dev@gmail.com.

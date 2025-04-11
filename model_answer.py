@@ -1,7 +1,3 @@
-import os
-os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
-import tensorflow as tf
-
 from tensorflow.keras.layers import Dense, Conv2D, MaxPooling2D, Dropout, Flatten, Input
 from tensorflow.keras.models import Sequential
 from tensorflow.keras import optimizers

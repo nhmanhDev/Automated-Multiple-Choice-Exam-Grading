@@ -138,13 +138,14 @@ def map_answer(idx):
 def get_answers(list_answers):
     results = defaultdict(list)
     model = CNN_Model('weight.keras').build_model(rt=True)
+    
     list_answers = np.array(list_answers)
     scores = model.predict_on_batch(list_answers / 255.0)
     for idx, score in enumerate(scores):
         question = idx // 4
 
         # score [unchoiced_cf, choiced_cf]
-        if score[1] > 0.99:  # choiced confidence score > 0.9
+        if score[1] > 0.99:  # choiced confidence score > 0.99
             chosed_answer = map_answer(idx)
             results[question + 1].append(chosed_answer)
 
@@ -222,7 +223,7 @@ def resize_image(input_path, output_path, target_size=(1056, 1500)):
 
 
 # if __name__ == '__main__':
-#     image_path = 'Exam/Test003.jpg'
+#     image_path = 'Exam/Test002.jpg'
 
 #     resize_image(image_path, 'output_resized.jpg')
 
