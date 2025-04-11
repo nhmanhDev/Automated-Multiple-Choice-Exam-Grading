@@ -4,232 +4,216 @@ import cv2
 from math import ceil
 from model_answer import CNN_Model
 from collections import defaultdict
+import os
+import logging
+import pandas as pd
 
-
-def get_x(s):
-    return s[1][0]
-
-
-def get_y(s):
-    return s[1][1]
-
-
-def get_h(s):
-    return s[1][3]
-
-
-def get_x_ver1(s):
-    s = cv2.boundingRect(s)
-    return s[0] * s[1]
-
+logger = logging.getLogger(__name__)
 
 def crop_image(img):
-    # convert image from BGR to GRAY to apply canny edge detection algorithm
+    logger.debug("Starting crop_image")
+    if img is None:
+        logger.error("Input image is None")
+        raise ValueError("Input image is None")
+    
     gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    # remove noise by blur image
+    height, width = gray_img.shape[:2]
+    total_area = height * width
+    
     blurred = cv2.GaussianBlur(gray_img, (5, 5), 0)
-
-    # apply canny edge detection algorithm
     img_canny = cv2.Canny(blurred, 100, 200)
-
-    # find contours
     cnts = cv2.findContours(img_canny.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     cnts = imutils.grab_contours(cnts)
 
     ans_blocks = []
     x_old, y_old, w_old, h_old = 0, 0, 0, 0
+    min_area = 0.10 * total_area
 
-    # ensure that at least one contour was found
     if len(cnts) > 0:
-        # sort the contours according to their size in descending order
-        cnts = sorted(cnts, key=get_x_ver1)
-
-        # loop over the sorted contours
-        for i, c in enumerate(cnts):
+    # Sắp xếp contours theo x
+        cnts = sorted(cnts, key=lambda c: cv2.boundingRect(c)[0])
+        for c in cnts:
             x_curr, y_curr, w_curr, h_curr = cv2.boundingRect(c)
+            # Chỉ lấy contour có diện tích > 10%
+            if w_curr * h_curr > min_area:
+                block_img = gray_img[y_curr:y_curr + h_curr, x_curr:x_curr + w_curr]
+                # Kiểm tra xem contour này có quá gần contour trước đó không
+                is_duplicate = False
+                for _, prev_coords in ans_blocks:
+                    x_prev, y_prev, w_prev, h_prev = prev_coords
+                    # Nếu vị trí và kích thước gần giống contour trước thì bỏ qua
+                    if (abs(x_curr - x_prev) < 10 and 
+                        abs(y_curr - y_prev) < 10 and 
+                        abs(w_curr - w_prev) < 10 and 
+                        abs(h_curr - h_prev) < 10):
+                        is_duplicate = True
+                        break
+                if not is_duplicate:
+                    ans_blocks.append((block_img, [x_curr, y_curr, w_curr, h_curr]))
 
-            if w_curr * h_curr > 100000:
-                # check overlap contours
-                check_xy_min = x_curr * y_curr - x_old * y_old
-                check_xy_max = (x_curr + w_curr) * (y_curr + h_curr) - (x_old + w_old) * (y_old + h_old)
-
-                # if list answer box is empty
-                if len(ans_blocks) == 0:
-                    ans_blocks.append(
-                        (gray_img[y_curr:y_curr + h_curr, x_curr:x_curr + w_curr], [x_curr, y_curr, w_curr, h_curr]))
-                    # update coordinates (x, y) and (height, width) of added contours
-                    x_old = x_curr
-                    y_old = y_curr
-                    w_old = w_curr
-                    h_old = h_curr
-                elif check_xy_min > 20000 and check_xy_max > 20000:
-                    ans_blocks.append(
-                        (gray_img[y_curr:y_curr + h_curr, x_curr:x_curr + w_curr], [x_curr, y_curr, w_curr, h_curr]))
-                    # update coordinates (x, y) and (height, width) of added contours
-                    x_old = x_curr
-                    y_old = y_curr
-                    w_old = w_curr
-                    h_old = h_curr
-
-        # sort ans_blocks according to x coordinate
-        sorted_ans_blocks = sorted(ans_blocks, key=get_x)
-        return sorted_ans_blocks
-
+        logger.info(f"Found {len(ans_blocks)} answer blocks")
+        return ans_blocks  # Đã được sắp xếp theo x
+    logger.warning("No answer blocks found")
+    return []
 
 def process_ans_blocks(ans_blocks):
-    """
-        this function process 2 block answer box and return a list answer has len of 200 bubble choices
-        :param ans_blocks: a list which include 2 element, each element has the format of [image, [x, y, w, h]]
-    """
+    logger.debug(f"Processing {len(ans_blocks)} answer blocks")
     list_answers = []
-
-    # Loop over each block ans in
-    for ans_block in ans_blocks:
-        ans_block_img = np.array(ans_block[0])
-
+    for idx, ans_block in enumerate(ans_blocks):
+        ans_block_img = ans_block[0]
+        if ans_block_img is None or ans_block_img.size == 0:
+            logger.error(f"Answer block {idx} is invalid")
+            raise ValueError(f"Answer block {idx} is invalid")
+        
         offset1 = ceil(ans_block_img.shape[0] / 6)
-        # Loop over each box in answer block
         for i in range(6):
-            box_img = np.array(ans_block_img[i * offset1:(i + 1) * offset1, :])
+            box_img = ans_block_img[i * offset1:(i + 1) * offset1, :]
+            if box_img.size == 0:
+                logger.error(f"Box {i} in block {idx} is empty")
+                raise ValueError(f"Box {i} in block {idx} is empty")
+            
             height_box = box_img.shape[0]
+            cut_top = ceil(height_box * 1.5 / 19)
+            cut_bottom = ceil(height_box * 1 / 19)
+            box_img = box_img[cut_top:height_box - cut_bottom, :]
 
-            box_img = box_img[14:height_box - 14, :]
             offset2 = ceil(box_img.shape[0] / 5)
-
-            # loop over each line in a box
             for j in range(5):
-                list_answers.append(box_img[j * offset2:(j + 1) * offset2, :])
-
+                line_img = box_img[j * offset2:(j + 1) * offset2, :]
+                if line_img.size == 0:
+                    logger.error(f"Line {j} in box {i}, block {idx} is empty")
+                    raise ValueError(f"Line {j} in box {i}, block {idx} is empty")
+                list_answers.append(line_img)
+    logger.debug(f"Processed {len(list_answers)} answer regions")
     return list_answers
 
-
 def process_list_ans(list_answers):
-    list_choices = []
-    offset = 44
-    start = 32
+    logger.debug("Processing list of answers")
+    if not list_answers or len(list_answers) == 0:
+        logger.error("List of answers is empty")
+        raise ValueError("List of answers is empty")
+    
+    img_width = list_answers[0].shape[1]
+    offset = (img_width // 7) * 6 // 4
+    start = (2 * img_width // 11)
 
-    for answer_img in list_answers:
+    list_choices = []
+    for idx, answer_img in enumerate(list_answers):
+        if answer_img.size == 0:
+            logger.error(f"Answer image {idx} is empty")
+            raise ValueError(f"Answer image {idx} is empty")
+        
         for i in range(4):
             bubble_choice = answer_img[:, start + i * offset:start + (i + 1) * offset]
-            bubble_choice = cv2.threshold(bubble_choice, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
-
+            if bubble_choice.size == 0:
+                logger.error(f"Bubble choice {i} in answer {idx} is empty")
+                raise ValueError(f"Bubble choice {i} in answer {idx} is empty")
+            
+            bubble_choice = cv2.threshold(bubble_choice, 127, 255, cv2.THRESH_BINARY)[1]
             bubble_choice = cv2.resize(bubble_choice, (28, 28), cv2.INTER_AREA)
             bubble_choice = bubble_choice.reshape((28, 28, 1))
             list_choices.append(bubble_choice)
 
     if len(list_choices) != 480:
-        raise ValueError("Length of list_choices must be 480")
+        logger.error(f"Length of list_choices must be 480, got {len(list_choices)}")
+        raise ValueError(f"Length of list_choices must be 480, got {len(list_choices)}")
+    logger.debug(f"Processed {len(list_choices)} bubble choices")
     return list_choices
 
-
-def map_answer(idx):
-    if idx % 4 == 0:
-        answer_circle = "A"
-    elif idx % 4 == 1:
-        answer_circle = "B"
-    elif idx % 4 == 2:
-        answer_circle = "C"
-    else:
-        answer_circle = "D"
-    return answer_circle
-
+# def save_list_ans(list_ans, prefix="bubble"):
+#     """Save list_ans as individual images or a NumPy file."""
+#     for idx, choice in enumerate(list_ans):
+#         filename = os.path.join(output_dir, f"{prefix}_{idx:03d}.png")
+#         cv2.imwrite(filename, choice.squeeze())  # Squeeze để bỏ chiều 1
+#     print(f"Saved {len(list_ans)} bubble choices to {output_dir}")
+#     # Lưu dưới dạng file NumPy (tùy chọn)
+#     np.save(os.path.join(output_dir, "list_ans.npy"), np.array(list_ans))
 
 def get_answers(list_answers):
-    results = defaultdict(list)
-    model = CNN_Model('weight.keras').build_model(rt=True)
-    
-    list_answers = np.array(list_answers)
-    scores = model.predict_on_batch(list_answers / 255.0)
-    for idx, score in enumerate(scores):
-        question = idx // 4
+    logger.debug("Getting final answers")
+    try:
+        model = CNN_Model('weight.keras').build_model(rt=True)  # Không cần truyền weight_path, dùng mặc định /src/weight.keras
+        list_answers = np.array(list_answers)
+        logger.debug(f"Predicting on {len(list_answers)} choices")
+        scores = model.predict_on_batch(list_answers / 255.0)
+        results = defaultdict(list)
+        for idx, score in enumerate(scores):
+            question = idx // 4
+            if score[1] > 0.99:
+                chosed_answer = ["A", "B", "C", "D"][idx % 4]
+                results[question + 1].append(chosed_answer)
+        logger.debug(f"Detected answers for {len(results)} questions")
+        return results
+    except Exception as e:
+        logger.exception("Error in get_answers")
+        raise
 
-        # score [unchoiced_cf, choiced_cf]
-        if score[1] > 0.99:  # choiced confidence score > 0.99
-            chosed_answer = map_answer(idx)
-            results[question + 1].append(chosed_answer)
-
-    return results
-
-# def resize_image(input_path, output_path, target_size=(1056, 1500)):
-#     """
-#     Hàm resize ảnh về kích thước target_size và lưu lại.
-    
-#     Args:
-#         input_path (str): Đường dẫn ảnh gốc.
-#         output_path (str): Đường dẫn ảnh sau khi resize.
-#         target_size (tuple): Kích thước đích (width, height). Mặc định (1056, 1500).
-#     """
-#     # Đọc ảnh
-#     img = cv2.imread(input_path)
-#     if img is None:
-#         print(f"Lỗi: Không thể đọc ảnh {input_path}")
-#         return
-
-#     # Resize ảnh
-#     img_resized = cv2.resize(img, target_size)
-
-#     # Lưu ảnh đã resize
-#     cv2.imwrite(output_path, img_resized)
-#     print(f"Ảnh đã được resize và lưu tại {output_path}")
-
-def annotate_answers(ans_blocks, answers, answer_key, questions_per_block=30, total_questions=120, img=None):
+def annotate_answers(ans_blocks, answers, answer_key, questions_per_block=30, img=None):
+    logger.debug("Annotating answers on image")
     if img is None:
-        annotated_img = cv2.imread('output_resized.jpg')
-    else:
-        annotated_img = img  # Sử dụng ảnh đã vẽ SBD/MDT
-    drawn_questions = set()
-
+        logger.error("No image provided for annotation")
+        raise ValueError("No image provided for annotation")
+    
+    annotated_img = img
     ans_blocks = sorted(ans_blocks, key=lambda b: b[1][0])
     for block_idx, ans_block in enumerate(ans_blocks):
         block_img, (x, y, w, h) = ans_block
         offset1 = ceil(h / 6)
         question_offset = block_idx * questions_per_block
-        
+
         for i in range(6):
             box_y = y + i * offset1
             box_h = offset1
-            box_img = block_img[i * offset1:(i + 1) * offset1, :]
-            box_img = box_img[14:box_h - 14, :]
-            offset2 = ceil((box_h - 28) / 5)
+            cut_top = ceil(box_h * 1 / 19)
+            cut_bottom = ceil(box_h * 1.5 / 19)
+            effective_box_hA = box_h - cut_top - cut_bottom
+            offset2 = ceil(effective_box_hA / 5)
+
             for j in range(5):
+                line_y = box_y + cut_top + j * offset2
+                offset = (w // 7 * 6) // 4
+                start = w // 7
+
                 question = question_offset + i * 5 + j + 1
-                if question > total_questions or question in drawn_questions:
+                if question > 120:  # Giả định 120 câu hỏi
                     continue
-                drawn_questions.add(question)
 
-                line_y = box_y + 14 + j * offset2
+                student_ans = answers.get(question, [])
+                correct_ans = answer_key[question]  # Không cần -1 vì key bắt đầu từ 1
+
                 for k in range(4):
-                    choice_x = x + 32 + k * 44
-                    student_ans = answers.get(question, [])
-                    correct_ans = answer_key.get(question, '')
-                    if student_ans and student_ans[0] == map_answer(k):
-                        color = (0, 255, 0) if student_ans[0] == correct_ans else (0, 0, 255)
-                        cv2.rectangle(annotated_img, (choice_x, line_y), (choice_x + 44, line_y + offset2), color, 2)
-                    elif map_answer(k) == correct_ans:
-                        cv2.rectangle(annotated_img, (choice_x, line_y), (choice_x + 44, line_y + offset2), (0, 255, 0), 2)
-
-    # cv2.imwrite('annotated_full_image.jpg', annotated_img)
+                    choice_x = x + start + k * offset
+                    choice_w = offset
+                    if student_ans and ["A", "B", "C", "D"][k] in student_ans:
+                        color = (0, 255, 0) if ["A", "B", "C", "D"][k] == correct_ans else (0, 0, 255)
+                        cv2.rectangle(annotated_img, (choice_x, line_y),
+                                    (choice_x + choice_w, line_y + offset2), color, 2)
+                    elif ["A", "B", "C", "D"][k] == correct_ans:
+                        cv2.rectangle(annotated_img, (choice_x, line_y),
+                                    (choice_x + choice_w, line_y + offset2), (0, 255, 0), 2)
     return annotated_img
 
-def resize_image(input_path, output_path, target_size=(1056, 1500)):
-    """Resize an image to target_size and save it."""
-    img = cv2.imread(input_path)
-    if img is None:
-        print(f"Error: Unable to read image at {input_path}")
-        return
-    img_resized = cv2.resize(img, target_size)
-    cv2.imwrite(output_path, img_resized)
-
-
-# if __name__ == '__main__':
-#     image_path = 'Exam/Test002.jpg'
-
-#     resize_image(image_path, 'output_resized.jpg')
-
-#     img = cv2.imread('output_resized.jpg')
-#     list_ans_boxes = crop_image(img)
-#     list_ans = process_ans_blocks(list_ans_boxes)
-#     list_ans = process_list_ans(list_ans)
-#     answers = get_answers(list_ans)
-#     print(answers)
+if __name__ == '__main__':
+    image_path = 'Exam/Test10diem.jpg'
+    img = cv2.imread(image_path)
+    
+    list_ans_boxes = crop_image(img)
+    if not list_ans_boxes:
+        print("No answer blocks found. Exiting.")
+    else:
+        list_ans = process_ans_blocks(list_ans_boxes)
+        list_ans_processed = process_list_ans(list_ans)
+        
+        # save_list_ans(list_ans_processed)
+        
+        answers = get_answers(list_ans_processed)
+        print("Detected answers:")
+        for question, ans in sorted(answers.items()):
+            print(f"Question {question}: {ans}")
+        
+        answerkey = pd.read_excel('AnswerKey/FullC.xlsx', engine='openpyxl')
+        answerkey = answerkey.iloc[:, 1].tolist()
+       
+        total_questions = len(answerkey)  # Dynamically set based on answer key length
+        annotated_img = annotate_answers(list_ans_boxes, answers, answerkey, total_questions=total_questions, img=img)
+        cv2.imwrite('annotated_full_image.jpg', annotated_img)

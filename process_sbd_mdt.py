@@ -12,27 +12,37 @@ def save_image(image, filename):
     """Save an image to the output_images directory."""
     cv2.imwrite(os.path.join(output_dir, filename), image)
 
-def resize_image(input_path, output_path, target_size=(1056, 1500)):
-    """Resize an image to target_size and save it."""
-    img = cv2.imread(input_path)
-    if img is None:
-        print(f"Error: Unable to read image at {input_path}")
-        return
-    img_resized = cv2.resize(img, target_size)
-    cv2.imwrite(output_path, img_resized)
+# def resize_image(input_path, output_path, target_size=(1056, 1500)):
+#     """Resize an image to target_size and save it."""
+#     img = cv2.imread(input_path)
+#     if img is None:
+#         print(f"Error: Unable to read image at {input_path}")
+#         return
+#     img_resized = cv2.resize(img, target_size)
+#     cv2.imwrite(output_path, img_resized)
 
-def detect_mid_contours(image_path, min_area=10000, max_area=40000):
+def detect_mid_contours(image_path):
     """Detect and extract two regions (student ID and test code) from an image."""
     img = cv2.imread(image_path)
     if img is None:
         print("❌ Unable to read image. Check file path.")
         return None, None
 
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+    gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    height, width = gray_img.shape[:2]
+    min_area = 0.01 * (width * height)
+    max_area = 0.03 * (width * height)
+    # print("Image size:", width, "x", height)
+    # print("Minimum area:", min_area, "Maximum area:", max_area)
+
+    blurred = cv2.GaussianBlur(gray_img, (3, 3), 0)
     edges = cv2.Canny(blurred, 100, 250)
     contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    # print(len(contours), "contours found")
+
     mid_contours = [c for c in contours if min_area <= cv2.contourArea(c) <= max_area]
+
+    # print(len(mid_contours), "contours in range")
 
     if len(mid_contours) != 2:
         print("⚠️ Expected 2 regions, but found a different number. Check input image!")
@@ -49,21 +59,34 @@ def detect_mid_contours(image_path, min_area=10000, max_area=40000):
     return sbd_img, mdt_img
 
 def detect_mid_contours_with_coords(image_path):
-        img = cv2.imread(image_path)
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-        edges = cv2.Canny(blurred, 100, 250)
-        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        mid_contours = [c for c in contours if 10000 <= cv2.contourArea(c) <= 40000]
-        if len(mid_contours) != 2:
-            print("⚠️ Expected 2 regions, but found a different number.")
-            return None, None, None, None
-        mid_contours = sorted(mid_contours, key=lambda c: cv2.boundingRect(c)[0])
-        x1, y1, w1, h1 = cv2.boundingRect(mid_contours[0])
-        x2, y2, w2, h2 = cv2.boundingRect(mid_contours[1])
-        sbd_img = img[y1:y1+h1, x1:x1+w1]
-        mdt_img = img[y2:y2+h2, x2:x2+w2]
-        return sbd_img, mdt_img, (x1, y1, w1, h1), (x2, y2, w2, h2)
+    img = cv2.imread(image_path)
+    if img is None:
+        print("❌ Unable to read image. Check file path.")
+        return None, None, None, None
+
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    height, width = img.shape[:2]
+    min_area = 0.01 * (width * height)
+    max_area = 0.03 * (width * height)
+
+    blurred = cv2.GaussianBlur(gray, (3, 3), 0)
+    edges = cv2.Canny(blurred, 100, 250)
+    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    mid_contours = [c for c in contours if min_area <= cv2.contourArea(c) <= max_area]
+
+    if len(mid_contours) != 2:
+        print("⚠️ Expected 2 regions, but found a different number.")
+        return None, None, None, None
+
+    mid_contours = sorted(mid_contours, key=lambda c: cv2.boundingRect(c)[0])
+    x1, y1, w1, h1 = cv2.boundingRect(mid_contours[0])
+    x2, y2, w2, h2 = cv2.boundingRect(mid_contours[1])
+    sbd_img = img[y1:y1+h1, x1:x1+w1]
+    mdt_img = img[y2:y2+h2, x2:x2+w2]
+    
+    return sbd_img, mdt_img, (x1, y1, w1, h1), (x2, y2, w2, h2)
+
 
 def process_sbd_id_block(id_block_img):
     """Split student ID block into 6 columns."""
@@ -104,7 +127,8 @@ def process_image_column(column_img):
     for i in range(10):
         cell_img = gray[i * offset_y:(i + 1) * offset_y, :]
         blurred = cv2.GaussianBlur(cell_img, (5, 5), 0)
-        _, binary_img = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
+        binary_img = cv2.threshold(blurred, 127, 255, cv2.THRESH_BINARY)[1]
+        # save_image(binary_img, f"cell_img_{i+1}.png")
         resized_cell = cv2.resize(binary_img, (28, 28))
         cells.append(resized_cell)
     return cells
@@ -118,9 +142,9 @@ def check_all_columns_filled(all_columns_cells):
     filled_cells = []  # List of tuples: (col_index, row_index)
     for col_idx, column_cells in enumerate(all_columns_cells):
         for row_idx, cell_img in enumerate(column_cells):
-            _, binary_img = cv2.threshold(cell_img, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
-            white_pixel_count = np.sum(binary_img == 255)
-            if white_pixel_count > (binary_img.size * 0.6):
+            # _, binary_img = cv2.threshold(cell_img, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
+            black_pixel_count = np.sum(cell_img == 0)
+            if black_pixel_count > (cell_img.size * 0.15):
                 filled_cells.append((col_idx, row_idx))
     return filled_cells
 
@@ -167,7 +191,7 @@ def annotate_block(columns, filled_cells, num_rows=10, label="sbd"):
 
 
 # # Main execution
-# image_path = 'Exam/Test003.jpg'
+# image_path = 'Exam/Test678_FullA.jpg'
 # resize_image(image_path, 'output_resized.jpg')
 # sbd, mdt = detect_mid_contours('output_resized.jpg')
 

@@ -26,7 +26,8 @@ COPY main.py ./main.py
 COPY process_sbd_mdt.py ./process_sbd_mdt.py
 COPY process_answer.py ./process_answer.py
 COPY model_answer.py ./model_answer.py
-ADD weight.keras ./weight.keras
+COPY weight.keras ./weight.keras
+RUN ls -l /src/weight.keras  # Add this line to check if the file exists
 
 # Sao chép thư mục static cho giao diện Front-end
 COPY favicon.ico ./favicon.ico
